@@ -1,7 +1,7 @@
 # Pocket Platoon
 A [PICO-8](https://www.lexaloffle.com/pico-8.php) party game for up to 8 buddies
 
-![Pocket Platoon screenshot](screenshot.png "Alpha version")
+[<img src="screenshot.png">](https://donbattery.github.io/pocket_platoon/)
 
 ### Alpha version - movement test
 

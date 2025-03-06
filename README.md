@@ -1,30 +1,36 @@
 # Pocket Platoon
-A [PICO-8](https://www.lexaloffle.com/pico-8.php) party game for up to 8 buddies
+A [PICO-8](https://www.lexaloffle.com/pico-8.php) party game for up to 4 buddies
 
 [<img src="screenshot.png">](https://donbattery.github.io/pocket_platoon/)
 
-### Alpha version - movement test
+### Beta Version - Death Match test
 
 ### Player 1 Keyboard
-**Movement**: <kbd>Left</kbd>, <kbd>Right</kbd>, <kbd>Up</kbd>, <kbd>Down</kbd>  
-**Start**: <kbd>M</kbd>  
+**Movement/Aim**: <kbd>Left</kbd>, <kbd>Right</kbd>, <kbd>Up</kbd>, <kbd>Down</kbd>  
+**Start/Shoot**: <kbd>M</kbd>  
 **Jetpack**: <kbd>N</kbd>  
 
 ### Player 2 Keyboard
-**Movement**:  <kbd>S</kbd>, <kbd>F</kbd>, <kbd>E</kbd>, <kbd>D</kbd>  
-**Start**: <kbd>Q</kbd>  
-**Jetpack**: <kbd>w</kbd>  
+**Movement/Aim**:  <kbd>S</kbd>, <kbd>F</kbd>, <kbd>E</kbd>, <kbd>D</kbd>  
+**Start/Shoot**: <kbd>Q</kbd>  
+**Jetpack**: <kbd>W</kbd>  
 
-### Player 1 - Player 8 - Joystick / Controller
+### Player 1 - Player 4 - Joystick / Controller
 
-Any SDL compatible controller with at least 6 buttons  
+Any SDL compatible controller with at least 6 buttons (left, right, up, down, A, B)
 
-### Movement
+### Weapons 
+- Pistol
+- Knife
+- UZI
+- Shotgun
+- Sniper Rifle
+- Rocket Launcher
+- Flamethrower
 
-<kbd>Double Down</kbd> while standing - Lie down  
-<kbd>Double Down</kbd> or <kbd>Double Up</kbd> while laying - Stand up  
-<kbd>Double Left</kbd> or <kbd>Double Right</kbd> while standing - Roll  
-Hold <kbd>Down</kbd> while rolling - Lie down  
-<kbd>Double Left</kbd> or <kbd>Double Right</kbd> while laying - Mini Roll  
+### Boxes 
+- HP
+- Weapon
 
-The Jetpack's fuel is drained while the Jetpack button is pushed, it is refilled if the button is not pushed. It refills faster on the ground than in the air.
+### Music
+[Gruber Jam - Space Lizards](https://www.lexaloffle.com/bbs/?tid=52127)

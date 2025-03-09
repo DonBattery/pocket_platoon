@@ -20,6 +20,28 @@ function debug(infos, pos)
   end
 end
 
+-- 2d vector
+_v2 = {}
+_v2.__index = _v2
+function _v2:new(x, y) return setmetatable({ x = x or 0, y = y or 0 }, self) end
+function v2(x, y) return _v2:new(x, y) end
+function _v2:__add(o) return _v2:new(self.x + o.x, self.y + o.y) end
+function _v2:__sub(o) return _v2:new(self.x - o.x, self.y - o.y) end
+function _v2:__mul(s) return _v2:new(self.x * s, self.y * s) end
+function _v2:__div(s) return _v2:new(self.x / s, self.y / s) end
+function _v2:__len() return sqrt(self.x ^ 2 + self.y ^ 2) end
+function _v2:eq(o) return self.x == o.x and self.y == o.y end
+function _v2:norm() local m = #self return m > 0 and self / m or v2() end
+function _v2:copy() return _v2:new(self.x, self.y) end
+function _v2:rand(lx, hx, ly, hy) return _v2:new(rand(lx, hx), rand(ly, hy)) end
+function _v2:randint(lx, hx, ly, hy) return _v2:new(randint(lx, hx), randint(ly, hy)) end
+function _v2:floor() return _v2:new(flr(self.x), flr(self.y)) end
+function _v2:ceil() return _v2:new(ceil(self.x), ceil(self.y)) end
+function _v2:dist(o) return sqrt(self:sqrdist(o)) end
+function _v2:sqrdist(o) return (o.x - self.x) ^ 2 + (o.y - self.y) ^ 2 end
+function _v2:limit(limit) self.x, self.y = mid(-limit[1], self.x, limit[1]), mid(limit[2], self.y, limit[3]) end
+function _v2:rot(a) local c, s = cos(a), sin(a) return _v2:new(self.x * c - self.y * s, self.x * s + self.y * c) end
+
 -- data parsers
 function parse_string_data(data, parser)
   local result = {}
@@ -59,6 +81,15 @@ function sprite_parser(data)
   return sprite
 end
 
+function get_sprite_hitbox(self)
+  local sprite = sprites[self.anim:get_frame()]
+  local point_a, point_b = sprite:get_point(3, self.pos, self.face_left), sprite:get_point(4, self.pos, self.face_left)
+  return {
+    pos = v2(min(point_a.x, point_b.x), min(point_a.y, point_b.y)),
+    size = v2(abs(point_a.x - point_b.x) + 1, abs(point_a.y - point_b.y) + 1)
+  }
+end
+
 function weapon_parser(data)
   local parts = split(data, ",")
   local weapon = {
@@ -87,36 +118,40 @@ function weapon_parser(data)
   return weapon
 end
 
+function player_parser(data)
+  local nums = {}
+  for part in all(split(data, ",")) do
+    add(nums, tonum(part))
+  end
+  local hud_points = {}
+  for i = 4, #nums, 2 do
+    add(hud_points, v2(nums[i], nums[i + 1]))
+  end
+  return new_player(nums[1], nums[2], nums[3], hud_points, nums[1] % 2 == 1)
+end
+
 -- ui box
 function round_box(pos, size, col)
   rectfill(pos.x, pos.y + 1, pos.x + size.x - 1, pos.y + size.y - 2, col)
   rectfill(pos.x + 1, pos.y, pos.x + size.x - 2, pos.y + size.y - 1, col)
 end
 
--- 2d vector
-_v2 = {}
-_v2.__index = _v2
-function _v2:new(x, y) return setmetatable({ x = x or 0, y = y or 0 }, self) end
-function v2(x, y) return _v2:new(x, y) end
-function _v2:__add(o) return _v2:new(self.x + o.x, self.y + o.y) end
-function _v2:__sub(o) return _v2:new(self.x - o.x, self.y - o.y) end
-function _v2:__mul(s) return _v2:new(self.x * s, self.y * s) end
-function _v2:__div(s) return _v2:new(self.x / s, self.y / s) end
-function _v2:__len() return sqrt(self.x ^ 2 + self.y ^ 2) end
-function _v2:eq(o) return self.x == o.x and self.y == o.y end
-function _v2:norm() local m = #self return m > 0 and self / m or v2() end
-function _v2:copy() return _v2:new(self.x, self.y) end
-function _v2:rand(lx, hx, ly, hy) return _v2:new(rand(lx, hx), rand(ly, hy)) end
-function _v2:randint(lx, hx, ly, hy) return _v2:new(randint(lx, hx), randint(ly, hy)) end
-function _v2:floor() return _v2:new(flr(self.x), flr(self.y)) end
-function _v2:ceil() return _v2:new(ceil(self.x), ceil(self.y)) end
-function _v2:dist(o) return sqrt(self:sqrdist(o)) end
-function _v2:sqrdist(o) return (o.x - self.x) ^ 2 + (o.y - self.y) ^ 2 end
-function _v2:limit(limit)
-  self.x = mid(-limit[1], self.x, limit[1])
-  self.y = mid(limit[2], self.y, limit[3])
+-- sorting
+function bsort(t, cond)
+  local length, swapped = #t
+  if length < 2 then return t end
+  repeat
+    swapped = false
+    for i = 2, length do
+      if cond(t[i], t[i - 1]) then
+        t[i], t[i - 1] = t[i - 1], t[i]
+        swapped = true
+      end
+    end
+    length -= 1
+  until not swapped
+  return t
 end
-function _v2:rot(a) local c, s = cos(a), sin(a) return _v2:new(self.x * c - self.y * s, self.x * s + self.y * c) end
 
 -- collision detection
 function point_collide_with_rect(p, r)
@@ -346,7 +381,7 @@ function new_particle_system()
 end
 
 function update_bullet(bullet, next_pos)
-  local points, weapon, spd, objects, hit_obj, hit_ground = points_between(bullet.pos, next_pos), bullet.weapon, bullet.spd, world:get_near_objects(bullet, 64)
+  local points, weapon, spd, objects, hit_obj, hit_ground = points_between(bullet.pos, next_pos), bullet.weapon, bullet.spd, world:get_objects(bullet, 64)
 
   if weapon == 6 and rnd() < .3 then
     smoke(points[1], randint(1, 3))
@@ -391,16 +426,19 @@ function update_bullet(bullet, next_pos)
         explosion(bullet.owner, p, spd, 6)
         -- w_pistol
       elseif weapon == 1 then
-        flash_struct(p, spd, 1, randint(1, 3))
+        flash_struct(p, spd, 1, 1, randint(1, 3))
         -- w_uzi
       elseif weapon == 3 then
-        flash_struct(p, spd, randint(1, 2), randint(2, 3))
+        flash_struct(p, spd, randint(1, 2), 1, randint(2, 3))
         -- w_shotgun
       elseif weapon == 4 then
-        flash_struct(p, spd, randint(1, 3), randint(2, 3))
+        flash_struct(p, spd, randint(1, 3), 1, randint(2, 3))
+        -- lazer
+      elseif weapon == 8 then
+        flash_struct(p, spd, randint(1, 3), 2, randint(2, 3))
       else
         -- w_rifle
-        explosion(bullet.owner, p, spd, 4)
+        explosion(bullet.owner, p, spd, 3)
       end
       return true
     end
@@ -485,12 +523,18 @@ function smoke(pos, burst)
   end
 end
 
-function spawn_effect(pos, col)
-  new_particle(1, 60, 2, pos, v2(), v2(), { 6, 5, 4, 3, 2, 1, 0 }, { 7, col })
+function spark(pos, burst)
+  for i = 1, burst or 1 do
+    new_particle(.5, randint(12, 36), 4, pos + _v2:rand(-1, 1, -1, 1), _v2:rand(-.5, .5, -.7, .1), v2(0, .01), { 0, 1, 1 }, { 7, 10, 8 })
+  end
+end
+
+function spawn_effect(pos, col1, col2)
+  new_particle(1, 50, 2, pos, v2(), v2(), { 6, 5, 4, 3, 2, 1, 0 }, { 7, col2 })
   for i = 1, 13 do
     local d = pos + _v2:rand(-8, 8, -8, 8)
     local dd = ((d - pos):norm() * -1) / 8
-    new_particle(.75, randint(35, 65), 4, d, dd, v2(), { 0, 1, 1, 2 }, { 7, col })
+    new_particle(.75, randint(40, 50), 4, d, dd, v2(), { 0, 1, 1, 2 }, { 7, col1 })
   end
 end
 
@@ -523,9 +567,8 @@ function explosion(owner, pos, dir, size)
     new_particle(.9, randint(20, 25), 3, pos + d, d * .07, v2(0, -.01), { 0, 1, 2, 2, 1 }, { 7, 10, 9, 8 })
   end
 
-  local objects = world:get_near_objects({ pos = pos }, 128)
-
-  for object in all(objects) do
+  new_particle(1, 10, 2, pos, v2(), v2(), { 1, 2, 3, 4 }, { 7 })
+  for object in all(world:get_objects({ pos = pos }, 128)) do
     object:knock(owner, (object.pos - pos):norm() * (size / 4), size / 2, size * 2, 8, physics_constants.exploded_speed_limit)
   end
 end
@@ -536,14 +579,17 @@ function heal_effect(pos, burst)
   end
 end
 
-function flash_struct(pos, dir, size, destruct_size)
-  local sizes = {
+function flash_struct(pos, dir, size, color, destruct_size)
+  local sizes, colors = {
     { 0, 1, 2, 2 },
     { 1, 2, 3, 3 },
     { 2, 3, 4, 4 }
+  }, {
+    { 7, 7, 10 },
+    { 7, 8, 2 }
   }
   destruct(pos, dir, destruct_size)
-  new_particle(.6, randint(8, 16), 3, pos, v2(), v2(), sizes[size], { 7, 7, 10 })
+  new_particle(.6, randint(8, 16), 3, pos, v2(), v2(), sizes[size], colors[color])
 end
 
 function jetpack_effect(pos)
@@ -557,21 +603,25 @@ function new_world()
     add_object = function(self, object)
       add(self.objects, object)
     end,
-    get_near_objects = function(self, obj, sqrdist, type)
+    get_objects = function(self, obj, sqrdist, type)
       local near_objects = {}
       for object in all(self.objects) do
-        if not (type and object.type ~= type) and object ~= obj and object.pos:sqrdist(obj.pos) < sqrdist then
-          add(near_objects, object)
+        if not (type and object.type ~= type) and object ~= obj then
+          if sqrdist == 0 or object.pos:sqrdist(obj.pos) < sqrdist then
+            add(near_objects, object)
+          end
         end
       end
       return near_objects
     end,
-    -- todo: make this function more robust, now it can stuck in an infinite loop
+    -- todo: make this function more robust, now it can get stuck in an infinite loop
     get_safe_spot = function(self, size)
       while true do
         local pos = _v2:randint(size + 1, 127 - size, 9 + size, 111 - size)
-        local objects = self:get_near_objects({ pos = pos }, size * size)
-        if (#objects == 0 and free_rect(pos - v2(size, size), v2(size * 2 + 1, size * 2 + 1))) return pos
+        local objects = self:get_objects({ pos = pos }, size * size)
+        if (#objects == 0 and free_rect(pos - v2(size, size), v2(size * 2 + 1, size * 2 + 1))) then
+          return pos
+        end
       end
     end,
     update = function(self)
@@ -585,16 +635,13 @@ function new_world()
     draw = function(self)
       for object in all(self.objects) do
         object:draw()
-        -- debug objects
-        -- local hb = object:get_hitbox()
-        -- rect(hb.pos.x, hb.pos.y, hb.pos.x + hb.size.x - 1, hb.pos.y + hb.size.y - 1, 8)
       end
     end
   }
 end
 
-function shoot(pos, aim, w_index, owner)
-  local weapon, dir, mod = weapons[w_index], dir_to_trans[aim][5]
+function shoot(pos, aim, dir, w_index, owner)
+  local weapon, mod = weapons[w_index]
   for i = 1, weapon.burst do
     local spd = (dir * rand(weapon.min_force, weapon.max_force)):rot(rand(-weapon.accuracy, weapon.accuracy))
     if aim == "w" or aim == "e" then
@@ -633,6 +680,7 @@ function game_object:new(type, pos, offset, size, color, climber)
       spd = v2(),
       in_air = 0,
       on_ground = 0,
+      hit_cd = 0,
       grounded = false,
       face_left = false,
       remove = false
@@ -646,6 +694,8 @@ end
 
 function game_object:update()
   if self.remove then return true end
+
+  self.hit_cd = max(0, self.hit_cd - 1)
 
   if free_rect(v2(self.origin.x, self.origin.y + self.size.y), v2(self.size.x, 1)) then
     self.in_air += 1
@@ -738,8 +788,8 @@ function new_box(kind, pos)
   local box = game_object:new(2, pos, v2(-2, -2), v2(5, 5), 0, false)
   box.kind, box.hp = kind, 5
   box.control = function(self)
-    local hitbox, near_soldiers = self:get_hitbox(), world:get_near_objects(self, 64, 1)
-    for soldier in all(near_soldiers) do
+    local hitbox = self:get_hitbox()
+    for soldier in all(world:get_objects(self, 64, 1)) do
       if not self.remove and rect_collide_with_rect(hitbox, soldier:get_hitbox()) then
         if self.kind == 1 and soldier.hp < 10 then
           heal_effect(soldier.pos, ceil(10 - soldier.hp))
@@ -755,9 +805,13 @@ function new_box(kind, pos)
     end
     return v2(0, self.gravity)
   end
-  box.draw = function(self) sprites[self.kind + 43]:draw(self.pos) end
+  box.draw = function(self)
+    if self.hit_cd > 0 then pal({ 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7 }, 0) end
+    sprites[self.kind + 43]:draw(self.pos)
+    pal()
+  end
   box.take_dmg = function(self, owner, min_dmg, max_dmg)
-    -- if self.remove then return end
+    self.hit_cd = 10
     self.hp -= rand(min_dmg, max_dmg)
     if self.hp <= 0 then
       self.remove = true
@@ -771,8 +825,167 @@ function new_box(kind, pos)
   return box
 end
 
+function new_enemy(spot)
+  local enemy = game_object:new(3, spot, v2(-2, -2), v2(5, 5), 0, true)
+  enemy.anim = new_animator({
+    forward = new_animation({ 56 }),
+    diagonal = new_animation({ 59 }),
+    up = new_animation({ 60 }),
+    knock_back = new_animation({ 64 }),
+    knock_forward = new_animation({ 63 }),
+    hit = new_animation({ 61, 62, 62, 62 }),
+    fly = new_animation({ 56, 57, 58, 58, 58, 58 }, 10)
+  })
+  enemy.owner = 0
+  enemy.prev_pos = spot
+  enemy.stuck = 0
+  enemy.stuck_cd = 10
+  enemy.unstuck_cd = 0
+  enemy.search_cd = 0
+  enemy.melee_cd = 0
+  enemy.shoot_cd = 0
+  enemy.target = nil
+  enemy.dir = v2()
+  enemy.face_down = false
+  enemy.hp = 8
+
+  enemy.get_hitbox = get_sprite_hitbox
+
+  enemy.control = function(self)
+    local t = self.target
+
+    self.anim:update()
+
+    self.stuck_cd = max(0, self.stuck_cd - 1)
+    self.unstuck_cd = max(0, self.unstuck_cd - 1)
+    self.search_cd = max(0, self.search_cd - 1)
+    self.melee_cd = max(0, self.melee_cd - 1)
+    self.shoot_cd = max(0, self.shoot_cd - 1)
+
+    if self.stuck_cd == 0 then
+      self.stuck_cd = randint(15, 45)
+      if self.pos:sqrdist(self.prev_pos) < 8 then
+        self.stuck += 1
+      end
+      self.prev_pos = self.pos
+      if self.stuck > 3 then
+        self.stuck = 0
+        self.dir = v2(1, 0):rot(rnd())
+        self.unstuck_cd = randint(35, 75)
+      end
+    end
+
+    local acc = v2(0, self.gravity)
+
+    local can_control = not (self.force_move_cd > 0 or self.anim.force)
+
+    if not can_control then
+      return acc
+    end
+
+    if t and t.remove then
+      self.target = nil
+    end
+
+    if self.search_cd == 0 then
+      self.search_cd = randint(60, 90)
+      local soldiers = bsort(world:get_objects(self, 0, 1), function(a, b) return a.pos:sqrdist(self.pos) < b.pos:sqrdist(self.pos) end)
+      if #soldiers > 0 then
+        self.target = soldiers[1]
+      end
+    end
+
+    if t then
+      self.dir = self.unstuck_cd == 0 and (t.pos - self.pos):norm() or self.dir
+      if self.dir.x < 0 then
+        self.face_left = true
+        acc.x = -.01
+      elseif self.dir.x > 0 then
+        self.face_left = false
+        acc.x = .01
+      end
+      if self.dir.y < 0 then
+        self.face_down = false
+        acc.y = -.01
+      else
+        self.face_down = true
+      end
+
+      if self.melee_cd == 0 then
+        if (self.pos:sqrdist(t.pos) < 64) and rnd() < .03 then
+          -- sfx(29)
+          self.anim:play("hit", 1, true)
+          local force = rand(.8, 1.2)
+          t:knock(t.owner, v2(self.face_left and -force or force, rand(-.5, -.3)), 1.2, 2.8, 16, physics_constants.air_speed_limit)
+          blood(t.pos, t.pos - self.pos, 5)
+          self.melee_cd = randint(90, 120)
+        end
+      end
+
+      if self.unstuck_cd == 0 and self.shoot_cd == 0 and rnd() < .01 then
+        self.shoot_cd = randint(30, 60)
+        local w_pos = sprites[self.anim:get_frame()]:get_point(2, self.pos, self.face_left, self.face_down)
+        local dir = (t.pos - w_pos):norm()
+        shoot(w_pos, "", dir, 8, 0)
+      end
+    end
+
+    if abs(self.spd.x) > .2 then
+      self.anim:play("fly")
+    else
+      local s = "forward"
+      if abs(self.dir.y) > .2 then
+        s = "diagonal"
+      end
+      if abs(self.dir.y) > .65 then
+        s = "up"
+      end
+      self.anim:play(s)
+    end
+    return acc
+  end
+
+  enemy.bullet_hit = function(self, bullet)
+    local w = weapons[bullet.weapon]
+    spark(bullet.pos, randint(w.min_dmg, w.max_dmg))
+    self:take_dmg(bullet.owner, w.min_dmg, w.max_dmg)
+  end
+
+  enemy.take_dmg = function(self, owner, min_dmg, max_dmg)
+    if owner == 0 then return end
+    self.hit_cd = 6
+    local dmg = rand(min_dmg, max_dmg)
+    self.hp -= dmg
+    spark(self.pos, ceil(dmg))
+    if self.hp <= 0 then
+      players[owner].score += 1
+      self.remove = true
+      explosion(owner, self.pos, _v2:rand(-.3, .3, -.7, -.3), randint(3, 5))
+    end
+  end
+
+  enemy.draw = function(self)
+    palt(0, false)
+    palt(14, true)
+    if self.hit_cd > 0 then pal({ 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7 }, 0) end
+    local sprite = sprites[self.anim:get_frame()]
+    sprite:draw(self.pos, self.face_left, false)
+    palt()
+    pal()
+    local eye_pos, suffer = sprite:get_point(2, self.pos, self.face_left, self.face_down), self.hp < 3
+    if suffer and rnd() < .01 then
+      spark(self.pos, 1)
+    end
+    pset(eye_pos.x, eye_pos.y, suffer and 2 or 8)
+  end
+
+  enemy.anim:play("forward")
+
+  return enemy
+end
+
 function new_soldier(spot, owner, joy, color1, color2)
-  soldier = game_object:new(1, spot, v2(-1, -3), v2(3, 6), color1, true)
+  local soldier = game_object:new(1, spot, v2(-1, -3), v2(3, 6), color1, true)
   soldier.owner = owner
   soldier.joy = joy
   soldier.color2 = color2
@@ -808,9 +1021,9 @@ function new_soldier(spot, owner, joy, color1, color2)
     if self.hp <= 0 then
       blood(self.pos, v2(0, -.3), 20)
       players[self.owner].soldier = nil
-      if owner == self.owner then
-        players[owner].score -= 1
-      else
+      if owner == self.owner or owner == 0 then
+        players[self.owner].score -= 1
+      elseif owner ~= 0 then
         players[owner].score += 1
       end
       self.remove = true
@@ -823,14 +1036,7 @@ function new_soldier(spot, owner, joy, color1, color2)
     self:take_dmg(bullet.owner, w.min_dmg, w.max_dmg)
   end
 
-  soldier.get_hitbox = function(self)
-    local sprite = sprites[self.anim:get_frame()]
-    local point_a, point_b = sprite:get_point(3, self.pos, self.face_left), sprite:get_point(4, self.pos, self.face_left)
-    return {
-      pos = v2(min(point_a.x, point_b.x), min(point_a.y, point_b.y)),
-      size = v2(abs(point_a.x - point_b.x) + 1, abs(point_a.y - point_b.y) + 1)
-    }
-  end
+  soldier.get_hitbox = get_sprite_hitbox
 
   soldier.get_weapon_pos = function(self)
     local w_idx_mod, flip_x, flip_y = unpack(dir_to_trans[self.aim])
@@ -900,7 +1106,7 @@ function new_soldier(spot, owner, joy, color1, color2)
       if joy.x.isdown then
         local melee, _, weapon_pos = false, self:get_weapon_pos()
         if self.melee_cd == 0 then
-          local objects = world:get_near_objects(self, 72)
+          local objects = world:get_objects(self, 72)
           local len, is_knife = #objects, self.weapon == 2
           if len > 0 then
             local hit_box, i = self:get_hitbox(), 1
@@ -917,8 +1123,8 @@ function new_soldier(spot, owner, joy, color1, color2)
                 if object.type == 1 then
                   blood(object.pos, object.pos - self.pos, ceil(dmg))
                   object.anim:play("roll_" .. (((object.spd.x < 0) == object.face_left) and "forward" or "backward"), 1, true)
-                else
-                  smoke(object.pos, ceil(dmg))
+                elseif object.type == 3 then
+                  object.anim:play("knock_" .. (((object.spd.x < 0) == object.face_left) and "forward" or "back"), 1, true)
                 end
               end
               i += 1
@@ -927,7 +1133,7 @@ function new_soldier(spot, owner, joy, color1, color2)
         end
 
         if not melee and self.magazine > 0 and self.weapon_cd == 0 and self.reload_cd == 0 then
-          self.weapon_cd = shoot(weapon_pos, self.aim, self.weapon, self.owner)
+          self.weapon_cd = shoot(weapon_pos, self.aim, dir_to_trans[self.aim][5], self.weapon, self.owner)
           self.magazine -= 1
           if self.magazine <= 0 then
             self.reload_cd = weapons[self.weapon].reload_time
@@ -1018,13 +1224,13 @@ function new_player(id, color1, color2, hud_points, face_left)
         self.spawning, self.msg = 3, "spawn in 3"
         local spot = v2()
         scheduler:add(
-          "spawn-soldier" .. self.id, 60, 3,
+          "spawn-soldier" .. self.id, 50, 3,
           function()
             self.spawning -= 1
             self.msg = "spawn in " .. self.spawning
             if self.spawning == 1 then
               spot = world:get_safe_spot(3)
-              spawn_effect(spot, self.color1)
+              spawn_effect(spot, self.color1, 15)
             end
           end,
           function()
@@ -1147,7 +1353,16 @@ function gen_map()
   for x = 0, 127 do
     for y = 0, 111 do
       if map[x][y] == 1 then
-        sset(x, y, rnd(1) < .85 and colors[1] or colors[2])
+        local ch = .6
+        if y > 2 then
+          if map[x][y - 1] == 1 then
+            ch += 1
+          end
+          if map[x][y - 2] == 1 then
+            ch += 2
+          end
+        end
+        sset(x, y, rnd(1) < 3 / ch and colors[1] or colors[2])
       else
         sset(x, y, 1)
       end

@@ -1,9 +1,12 @@
 # Pocket Platoon
-A [PICO-8](https://www.lexaloffle.com/pico-8.php) party game for up to 4 buddies
+A [PICO-8](https://www.lexaloffle.com/pico-8.php) party game for up to 4 buddies  
 
-[<img src="screenshot.png">](https://donbattery.github.io/pocket_platoon/)
+[<img src="screenshot.png">](https://donbattery.github.io/pocket_platoon/)  
 
-### Beta Version - Death Match test
+**CLICK ON THE SCREENSHOT TO PLAY**  
+
+
+### Beta Version - Chaos Mode test
 
 ### Player 1 Keyboard
 **Movement/Aim**: <kbd>Left</kbd>, <kbd>Right</kbd>, <kbd>Up</kbd>, <kbd>Down</kbd>  
@@ -30,7 +33,10 @@ Any SDL compatible controller with at least 6 buttons (left, right, up, down, A,
 
 ### Boxes 
 - HP
-- Weapon
+- Weapon 
+
+### Enemies
+- Cyber Octopus
 
 ### Music
 [Gruber Jam - Space Lizards](https://www.lexaloffle.com/bbs/?tid=52127)

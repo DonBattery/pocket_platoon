@@ -19,7 +19,7 @@ A [PICO-8](https://www.lexaloffle.com/pico-8.php) party game for up to 4 buddies
 
 ### Player 1 - Player 4 - Joystick / Controller
 
-Any SDL compatible controller with at least 6 buttons (left, right, up, down, A, B)
+Any SDL compatible controller with at least 6 buttons (left, right, up, down, A, B) is supported
 
 ### Weapons  
 - Pistol 
@@ -38,8 +38,12 @@ You get a Pistol by default. Picking up a Weapon Box will change your weapon to 
 
 Every soldier has 10 HP by default. You cannot pick up a HP Box if your HP is 10. Picking up a HP Box will restore your HP to 10.
 
-### Enemies
-- Cyber Octopus (Weapon: Lazer Melee: Cyber Tentacles)
+### Traps  
+
+- Barrels  
+
+### Enemies  
+- Techno Squid (Weapon: Lazer Melee: Cyber Tentacles)
 
 ### Music
 [Gruber Jam - Space Lizards](https://www.lexaloffle.com/bbs/?tid=52127)

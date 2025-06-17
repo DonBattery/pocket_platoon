@@ -1,4 +1,2 @@
-- In the spirit of Pico-8 the whole source code is open source.
+- In the spirit of Pico-8 the whole source code, and art work is open source.
 - The music (Gruber Jam - Space Lizards) is royalty free, so you can also use it in your Pico-8 games.
-- You can use the pictures from the sprite sheet as you like.
-- The only thing you cannot use is the name of the game (Pocket Platoon) and the Label image. 

@@ -5,7 +5,7 @@ A [PICO-8](https://www.lexaloffle.com/pico-8.php) party game for up to 4 buddies
 
 **CLICK ON THE SCREENSHOT TO PLAY**  
 
-### Closed Alpha - Chaos Mode test
+### Open Beta
 
 ### Player 1 Keyboard
 **Movement/Aim**: <kbd>Left</kbd>, <kbd>Right</kbd>, <kbd>Up</kbd>, <kbd>Down</kbd>  
@@ -24,11 +24,14 @@ Any SDL compatible controller with at least 6 buttons (left, right, up, down, A,
 ### Weapons  
 - Pistol 
 - Knife
-- UZI
+- Bolter
 - Shotgun
-- Sniper Rifle
-- Rocket Launcher
-- Flamethrower  
+- Lazer Rifle
+- RPG
+- Flamer
+- Granadeer
+- Orber
+- Molter
 
 ### Boxes 
 - HP
@@ -36,14 +39,17 @@ Any SDL compatible controller with at least 6 buttons (left, right, up, down, A,
 
 You get a Pistol by default. Picking up a Weapon Box will change your weapon to a random weapon which is not a Pistol, and not the one you are currently holding.  
 
-Every soldier has 10 HP by default. You cannot pick up a HP Box if your HP is 10. Picking up a HP Box will restore your HP to 10.
+Every soldier has 10 HP by default. You can only pick up a HP Box when your HP is below 10. Picking up a HP Box will restore your HP to 10.
 
 ### Traps  
 
 - Barrels  
+- Mines  
 
 ### Enemies  
 - Techno Squid (Weapon: Lazer Melee: Cyber Tentacles)
 
 ### Music
 [Gruber Jam - Space Lizards](https://www.lexaloffle.com/bbs/?tid=52127)
+
+- you can turn off the music separately from the PICO-8 menu

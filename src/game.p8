@@ -1,18 +1,24 @@
 pico-8 cartridge // http://www.pico-8.com
 version 42
 __lua__
--- utility
+-- git repo: https://github.com/DonBattery/pocket_platoon
+-- music: Gruber Jam - Space Lizards https://www.lexaloffle.com/bbs/?tid=52127
+
+-- environment utility
 _g = _ENV
 function env(o)
  return setmetatable(o, { __index = _ENV })
 end
 
+-- no operation
 function nope() end
 
+-- random numbers
 function rand(l, h) return rnd(abs(h - l)) + min(l, h) end
-
 function randint(l, h) return flr(rnd(abs(h + 1 - l))) + min(l, h) end
+function jitt() return randint(-1, 1) end
 
+-- pretty print with shadow or outline and indention
 function pprint(s, x, y, c1, c2, ind, out)
  x -= ind == "r" and print(s, 0, 128) or ind == "c" and print(s, 0, 128) / 2 or 0
  if out then
@@ -27,6 +33,7 @@ function pprint(s, x, y, c1, c2, ind, out)
  print(s, x, y, c1)
 end
 
+-- simple table sort
 function sort(t, cond)
  for i, ti in inext, t do
   for j, tj in inext, t do
@@ -37,18 +44,20 @@ function sort(t, cond)
  end
 end
 
+-- turn every color to a specified one (flashing effect of sprites)
 function pal_spec(v)
  for i = 0, 15 do
   pal(i, v)
  end
 end
 
+-- reset the palette and set transparency (black is opaque and pink is transparent)
 function ppal()
  pal()
  palt(0b0000000000000010)
 end
 
--- 2d vector
+-- 2d vector class
 v2 = {}
 v2.__index = v2
 setmetatable(
@@ -69,14 +78,17 @@ function v2:limit(l) self.x, self.y = mid(-l, self.x, l), mid(-l, self.y, l) end
 function v2:rot(a) local c, s = cos(a), sin(a) return v2(self.x * c - self.y * s, self.x * s + self.y * c) end
 function v2:ab() return rand(self.x, self.y) end
 
+-- point collide with rect
 function p_coll(p, r)
  return not (p.x < flr(r.pos.x) or flr(p.x) > r.pos.x + r.size.x - 1 or p.y < flr(r.pos.y) or flr(p.y) > r.pos.y + r.size.y - 1)
 end
 
+-- rect collide with rect
 function r_coll(a, b)
  return not (a.pos.x + a.size.x - 1 < flr(b.pos.x) or flr(a.pos.x) > b.pos.x + b.size.x - 1 or a.pos.y + a.size.y - 1 < flr(b.pos.y) or flr(a.pos.y) > b.pos.y + b.size.y - 1)
 end
 
+-- get the list of points between two coordinates, using bresenham's line algorithm
 function ray(p1, p2)
  local pts, x1, y1, x2, y2 = {}, flr(p1.x), flr(p1.y), flr(p2.x), flr(p2.y)
  local dx, dy, sx, sy = abs(x2 - x1), abs(y2 - y1), x1 < x2 and 1 or -1, y1 < y2 and 1 or -1
@@ -95,7 +107,7 @@ function ray(p1, p2)
  return pts
 end
 
--- control
+-- joystick
 function joy(pid)
  local j = env({
   upd = function(_ENV)
@@ -121,41 +133,44 @@ function joy(pid)
 end
 
 -- data decoders
-function conv(et, e)
- return et < 3 and e or et == 5 and split(e, "@") or et == 3 and v2(unpack(split(e, ":"))) or e == 1
+-- convert one element based on type and value strings
+function conv(type, e)
+ return type < 3 and e or type == 5 and split(e, "@") or type == 3 and v2(unpack(split(e, ":"))) or e == 1
 end
 
-function use_data(fs, ds, cb, i)
- local fi, rs = {}, split(ds, "|")
- for f in all(split(fs)) do
-  add(fi, split(f, ";"))
+-- decompress string data and call a function on each record (or just on a specific one if id is specified)
+function use_data(format, data, cb, id)
+ local fields, records = {}, split(data, "|")
+ for field in all(split(format)) do
+  add(fields, split(field, ";"))
  end
- local function rec(r)
-  local o, ts = {}, split(r)
-  for i, f in pairs(fi) do
-   local t, k = unpack(f)
-   if t < 10 then
-    o[k] = conv(t, ts[i])
+ local function decode(record)
+  local o, tags = {}, split(record)
+  for i, field in pairs(fields) do
+   local type, key = unpack(field)
+   if type < 10 then
+    o[key] = conv(type, tags[i])
    else
-    o[k] = {}
-    for e in all(split(ts[i], "#")) do
-     add(o[k], conv(t % 10, e))
+    o[key] = {}
+    for elem in all(split(tags[i], "#")) do
+     add(o[key], conv(type % 10, elem))
     end
    end
   end
   return cb(o)
  end
- if i then
-  return rec(rs[i])
+ if id then
+  return decode(records[id])
  end
  local o = {}
- for r in all(rs) do
-  add(o, rec(r))
+ for record in all(records) do
+  add(o, decode(record))
  end
  return o
 end
 
--- constructors
+-- constructor functions to build objects and functions from data records
+-- build a menu
 function menu_c(o)
  o.draw = function(_ENV)
   for p in all(players) do
@@ -189,7 +204,9 @@ function menu_c(o)
  return env(o)
 end
 
+-- build a sprite
 function sprite_c(o)
+ -- maintain a list of flipped points for fast drawing of mirrored sprites
  o.flip = {}
  o.get_p = function(_ENV, pos, i, f_x, f_y)
   local base, base_flip = pts[1], flip[1]
@@ -208,9 +225,11 @@ function sprite_c(o)
  return env(o)
 end
 
+-- build an animator from a group id. a group is a list of animations belonging to one object
 function new_anim(group_id)
  local a = env({
   gid = group_id,
+  -- the animator maintain its own flipped states
   f_x = false,
   f_y = false,
   upd = function(_ENV)
@@ -247,17 +266,20 @@ function new_anim(group_id)
  return a
 end
 
+-- build a player
 function player_c(o)
  o.joy = joy(o.id - 1)
 
  o.upd = function(_ENV)
   joy:upd()
+  -- the players can connect in any stage of the game, except when the menu is on cooldown
   if not conn then
    if (joy.o.press or joy.x.press) and not cd.menu then
     sfx(28)
     conn, cd.menu = true, 10
    end
   else
+   -- if the game is running handle the respawning of the player's soldier
    if state == 3 then
     if spwn > 0 then
      spwn -= 1
@@ -280,12 +302,14 @@ function player_c(o)
  end
 
  o.draw = function(_ENV)
+  -- if not connected or the soldier is respawning display the message
   if not conn or spwn > 0 then
    pprint(msgs[msg], msg_x, msg_y, c1, 0, ind)
   end
   if conn then
    local c = c3
    if soldier then
+    -- based on the amount of hp left, set the skin color of the portrait
     c = soldier.hp < soldier.ulhp and 2 or soldier.hp < soldier.lhp and 8 or c3
     -- hp bar
     rectfill(hp_x1, hp_y1, hp_x2, hp_y2, 8)
@@ -311,6 +335,7 @@ function player_c(o)
     -- score
     pprint(scr, scr_x, scr_y, c1, 0, ind)
    end
+   -- portrait sprite
    if spwn == 0 then
     pal(1, c)
     sprites[spr_i]:draw(pos)
@@ -322,21 +347,57 @@ function player_c(o)
  return env(o)
 end
 
--- acquire target
+-- build a weapon
+function weapon_c(o)
+ o.shoot = function(_ENV, pos, aim, ow, te, l)
+  sfx(msfx)
+  -- soldiers can aim in 8 direction with a string, enemies can aim in any direction with a vector
+  if type(aim) == "string" then
+   pos, aim = get_m_pos(_ENV, pos, aim, l), aims[aim].v2_mod + v2(0, (aim == "e" or aim == "w") and -v_m or 0)
+  end
+  -- add the muzzle effect and the projectile(s) to the particle system
+  _g[m_fn](pos)
+  _g[proj_fn](pos, bu, aim, fo, 0, co, nil, nil, upd_proj, ow, te, _ENV)
+  return w_cd
+ end
+
+ -- get the muzzle's position based on the current animation frame, aim and direction (facing left or right)
+ o.get_m_pos = function(_ENV, pos, aim, l)
+  return sprites[1 + spr_i + aims[aim].sp_i]:get_p(pos, 2, aim == "n" and l or aim == "s" and not l or aims[aim].f_x, aims[aim].f_y)
+ end
+
+ -- draw the weapon relative to a position (soldier's hand), with an aim and direction
+ o.draw = function(_ENV, pos, aim, l)
+  sprites[1 + spr_i + aims[aim].sp_i]:draw(pos, aim == "n" and l or aim == "s" and not l or aims[aim].f_x, aims[aim].f_y)
+ end
+
+ -- draw the portrait sprite of the weapon
+ o.draw_p = function(_ENV, pos, l)
+  sprites[spr_i]:draw(pos, l)
+ end
+
+ return env(o)
+end
+
+-- acquire target around an object, in a radius (include object by filter, exclude object by owner)
 function acq_tar(_ENV, r, filter, owner)
  tars = w_get(_ENV, r, filter)
  for tar in all(tars) do
   if (tar._ow == owner) del(tars, tar)
  end
  if #tars > 0 then
+  -- return the closest target
   sort(tars, function(a, b) return a.pos:sqrdist(pos) < b.pos:sqrdist(pos) end)
   return tars[1]
  end
 end
 
+-- update a projectile
 function upd_proj(_ENV)
+ -- get the objects around the projectile and cast a ray between its current and next position
  local objs, pts, w_i, hit_obj, hit_ground, prev = w_get(_ENV, 64, 0), ray(pos, n_pos), we.id
 
+ -- heat seeking missile
  if w_i == 6 then
   if rnd() < .2 then smkc(pos) end
   if not tar then
@@ -350,16 +411,17 @@ function upd_proj(_ENV)
     tar = nil
    else
     local d = tar.pos - pos
-    acc.x = d.x < 0 and -0.1 or d.x > 0 and 0.1 or 0
-    acc.y = d.y < 0 and -0.1 or d.y > 0 and 0.1 or 0
+    acc.x, acc.y = d.x < 0 and -0.1 or d.x > 0 and 0.1 or 0, d.y < 0 and -0.1 or d.y > 0 and 0.1 or 0
     spd:limit(.65)
    end
   end
  end
 
+ -- walk over the ray
  for i = 1, #pts do
   p = pts[i]
 
+  -- if the projectile hit any object (units cannot hit themselves with new projectiles for 16 frame)
   for o in all(objs) do
    if p_coll(p, o:get_hb()) and (life > 16 or o._ow ~= ow) then
     hit_obj = o
@@ -369,9 +431,11 @@ function upd_proj(_ENV)
 
   if not hit_obj then
    local nc = get_px(p.x, p.y)
+   -- if the projectile hit the ground (except for flamethrower, which has a chance to go through the ground)
    if (nc ~= 1 and nc ~= 17) and (w_i ~= 7 or rnd() < .3) then
     life += 10
     prev = i > 1 and pts[i - 1] or p
+    -- grande bounces off the ground
     if w_i == 8 then
      local d = p - prev
      if d.x ~= 0 then
@@ -394,10 +458,12 @@ function upd_proj(_ENV)
      n_pos = prev
     else
      hit_ground = p
+     -- knife creates colored pixels
      if w_i == 2 then
       set_px(p.x, p.y, 7)
       set_px(prev.x, prev.y, 4)
      end
+     -- molter blobs stick to the ground
      if w_i == 10 then
       spd, acc = v2(), v2()
      end
@@ -407,8 +473,10 @@ function upd_proj(_ENV)
   end
  end
 
+ -- decide if the projectile should explode (grande and molter blob explodes on expire too)
  if hit_obj or (hit_ground and w_i ~= 10) or (eol and (w_i == 8 or w_i == 10)) then
   eol = not (w_i == 9 and hit_ground)
+  -- flamethrower alters the color of hit pixels
   if w_i == 7 and hit_ground then
    set_px(hit_ground.x, hit_ground.y, rnd() < .25 and 1 or 0)
   end
@@ -416,37 +484,12 @@ function upd_proj(_ENV)
  end
 end
 
-function weapon_c(o)
- o.shoot = function(_ENV, pos, aim, ow, te, l)
-  sfx(msfx)
-  local m_pos = pos
-  if type(aim) == "string" then
-   m_pos = get_m_pos(_ENV, pos, aim, l)
-   aim = aims[aim].v2_mod + v2(0, (aim == "e" or aim == "w") and -v_m or 0)
-  end
-  _g[m_fn](m_pos)
-  _g[proj_fn](m_pos, bu, aim, fo, 0, co, nil, nil, upd_proj, ow, te, _ENV)
-  return w_cd
- end
-
- o.get_m_pos = function(_ENV, pos, aim, l)
-  return sprites[1 + spr_i + aims[aim].sp_i]:get_p(pos, 2, aim == "n" and l or aim == "s" and not l or aims[aim].f_x, aims[aim].f_y)
- end
-
- o.draw = function(_ENV, pos, aim, l)
-  sprites[1 + spr_i + aims[aim].sp_i]:draw(pos, aim == "n" and l or aim == "s" and not l or aims[aim].f_x, aims[aim].f_y)
- end
-
- o.draw_p = function(_ENV, pos, l)
-  sprites[spr_i]:draw(pos, l)
- end
-
- return env(o)
-end
-
+-- update spawners
 function upd_spwn()
  local spwn = spwns[spwn_i]
+ -- decide the maximum number of object from the current category (in War mode enemies are multiplied by 1.5)
  local max_obj = obj_nums[spwn_i][menus[1]:get(spwn.id)] * (spwn.mult and menus[1]:get(1) == 1 and 1.5 or 1)
+ -- if there is not enough objects, roll D4 and spawn a new one on 1
  if #w_get(nil, 0, spwn.filter) < max_obj and rnd() < .25 then
   local spot, i = w_spot(), randint(1, spwn.no * 2 - 1) \ 2 + 1
   spawn_fx(spot, spwn.fxs[i], spwn.f_s[i], { spwn.cols[(i - 1) * 2 + 1], spwn.cols[(i - 1) * 2 + 2] })
@@ -456,10 +499,12 @@ function upd_spwn()
    end
   )
  end
+ -- step to the next category, skip enemies in Arena mode
  spwn_i = (spwn_i % (menus[1]:get(1) == 2 and 2 or 3)) + 1
  schedule(randint(20, 30), upd_spwn)
 end
 
+-- update countdown, play sound if just 10 seconds left, end game if time is up
 function upd_countdown()
  countdown -= 1
  if countdown == 10 then sfx(57) end
@@ -476,6 +521,7 @@ function upd_countdown()
 end
 
 -- map
+-- get a pixel's color from the map, if the coords are outside we will get 17 on sides and top, and 16 on bottom
 function get_px(x, y)
  if x < 0 or x >= 128 or y < 8 then return 17 end
  if y >= 120 then return 16 end
@@ -487,6 +533,7 @@ function get_px(x, y)
  return (v >> 4) & 0x0f
 end
 
+-- set a pixels color on the map, if the coords are outside nothing will happen
 function set_px(x, y, c)
  if x < 0 or x >= 128 or y < 8 or y >= 120 then return end
  x, y = flr(x), flr(y)
@@ -500,6 +547,7 @@ function set_px(x, y, c)
  poke(addr, v)
 end
 
+-- check if a rectangle is free on the map (only contains air)
 function free(p, s)
  for x = p.x, p.x + s.x - 1 do
   for y = p.y, p.y + s.y - 1 do
@@ -509,14 +557,18 @@ function free(p, s)
  return true
 end
 
+-- generate a map using a cellular automata
 function gen_map()
  pprint("chaos emerges,", 24, 26, 11, 0, "l", true)
  pprint("last war approaches", 28, 35, 11, 0, "l", true)
  hud()
+ -- we need to flip the above text and hud onto the screen, because this function takes about 2.5 sec to complete
  flip()
+ -- decide the strength, density, shape, fabric and colors of the map
  local m = menus[2]
  local den, sha, fab = .465 + m:get(1) * .015, m:get(2), m:get(3)
  w_str, map_done, bg_col, b_col, hi_col, dmg_col = fab * .2, true, unpack(map_cols[(fab - 1) * 3 + randint(1, 3)])
+ -- create the map and a temp map in memory and fill them with noise (based on density and shape)
  local map, tmp = {}, {}
  for x = 0, 131 do
   map[x], tmp[x] = {}, {}
@@ -525,6 +577,7 @@ function gen_map()
    tmp[x][y] = map[x][y]
   end
  end
+ -- run the cellular automata 3 times, (this will make walls stick to other walls, and air to other airs)
  for _ = 1, 3 do
   for x = 2, 129 do
    for y = 2, 113 do
@@ -539,11 +592,13 @@ function gen_map()
   end
   map, tmp = tmp, map
  end
+ -- write the map directly into user memory (we will use memcpy to draw the map onto the screen)
  for y = 0, 111 do
   for x = 0, 126, 2 do
    local col = { 1, 1 }
    for p = 0, 1 do
     if map[x + p + 2][y + 2] == 1 then
+     -- determine the color of the pixel
      local ch = .13
      for off = 1, 3 do
       if y > 2 and map[x + p + 2][y + 2 - off] == 0 then
@@ -558,28 +613,7 @@ function gen_map()
  end
 end
 
-function destruct(pos, dir, l)
- for i = 1, #l do
-  local s, str = l[i][1], l[i][2]
-  if s % 2 == 0 then pos += v2(randint(-1, 1), randint(-1, 1)) end
-  local m, ps = str - w_str, 0
-  for p in all(dests[s]) do
-   local x, y = pos.x + p.x, pos.y + p.y
-   local c, r = get_px(x, y), 1
-   if c ~= 1 and c < 16 then
-    if rnd() > m + (c == dmg_col and .3 or 0) then
-     r = dmg_col
-    end
-    if ((c ~= dmg_col) or (r == 1)) and rnd() < (ps < 7 and 1 or 1 - (ps - 7) / 20) then
-     ps += 1
-     drt(v2(x, y), 1, dir * (rnd() < .25 and -1 or 1), v2(.2, .7), 0, 0, nil, { c })
-    end
-    set_px(x, y, r)
-   end
-  end
- end
-end
-
+-- increase level of drama, shake camera if too much drama
 function drama()
  drama_v += 6
  drama_t = 0
@@ -589,7 +623,7 @@ function drama()
  end
 end
 
--- game objects
+-- game object
 function gob(id, p, _on_imp, _on_upd, _on_b_draw, _on_a_draw, _on_die, _on_land)
  return use_data(
   gof, god, function(o)
@@ -619,7 +653,9 @@ function gob(id, p, _on_imp, _on_upd, _on_b_draw, _on_a_draw, _on_die, _on_land)
      cd[k] = v > 0 and v - 1 or nil
     end
 
+    -- suffer if low hp
     if (hp < lhp and rnd() < .01) on_suf(pos, hp < ulhp and 2 or 1, spd, v2(.3, .6))
+    -- check if we are in the air
     if free(v2(pos.x + off.x, pos.y + off.y + si.y), v2(si.x, 1)) then
      air += 1
      ground = false
@@ -635,6 +671,7 @@ function gob(id, p, _on_imp, _on_upd, _on_b_draw, _on_a_draw, _on_die, _on_land)
      air, ground = 0, true
     end
 
+    -- set gravity, friction and speed limit if movement is not forced
     if not cd.f_move then
      if ground then
       gra, fri, slim = 0, .96, .45
@@ -642,19 +679,25 @@ function gob(id, p, _on_imp, _on_upd, _on_b_draw, _on_a_draw, _on_die, _on_land)
       gra, fri, slim = .06, .98, .85
      end
     end
+
+    -- update the speed with acceleration (provided by custom update fn, passive objects just return the gravity here)
     spd += on_upd(_ENV)
     spd:limit(slim)
     spd *= fri or 1
+    -- slow object will eventually stop
     if (abs(spd.x) < 0.005) spd.x = 0
     if (abs(spd.y) < 0.005) spd.y = 0
+    -- cast a ray to the next desired position
     local n_pos = pos + spd
     local pts = ray(pos, n_pos)
     local l = #pts
+    -- walk the ray and check for collision and resolution
     if l > 1 then
      for i = 2, l do
       local prev = pts[i - 1]
       local can, block, res = step(_ENV, prev, pts[i] - prev)
       if not can then
+       -- climber objects (the soldier) are stick to the ground, and may climb slopes, while non climbers (everything else) are bounce back
        spd.x *= (not cli and block.x == 0) and -.8 or block.x
        spd.y *= (not cli and block.y == 0) and -.75 or block.y
        n_pos = (res and res or prev) + v2(.5, .5)
@@ -662,9 +705,12 @@ function gob(id, p, _on_imp, _on_upd, _on_b_draw, _on_a_draw, _on_die, _on_land)
       end
      end
     end
+    -- set current position
     pos = n_pos
    end
 
+   -- check if the object can move from one point in the ray to the next
+   -- if not, offer a resolution if possible, if not possible stop the object
    o.step = function(_ENV, pos, dir)
     if not cango(_ENV, pos, dir) then
      if dir.x ~= 0 then
@@ -677,6 +723,7 @@ function gob(id, p, _on_imp, _on_upd, _on_b_draw, _on_a_draw, _on_die, _on_land)
       else
        if cango(_ENV, pos, v2(dir.x, -1)) then
         return false, v2(.75, 1), pos + v2(dir.x, -1)
+        -- climber objects can try to climb 2 pixel tall slopes
        elseif cli and cango(_ENV, pos, v2(dir.x, -2)) then
         return false, v2(.3, .75), pos + v2(dir.x, -2)
        elseif cango(_ENV, pos, v2(dir.x, 1)) then
@@ -693,12 +740,14 @@ function gob(id, p, _on_imp, _on_upd, _on_b_draw, _on_a_draw, _on_die, _on_land)
     return true
    end
 
+   -- decide if one step is possible or not by checking just the relevant edges for blocking pixels
    o.cango = function(_ENV, pos, dir)
     if (dir.x ~= 0 and not free(pos + off + (dir.x < 0 and v2(-1, dir.y) or v2(si.x, dir.y)), v2(1, si.y))) return false
     if (dir.y ~= 0 and not free(pos + off + (dir.y < 0 and v2(dir.x, dir.y) or v2(dir.x, si.y)), v2(si.x + abs(dir.y) - 1, abs(dir.y)))) return false
     return true
    end
 
+   -- apply impact on object, by forcing its movement and dealing damage
    o.imp = function(_ENV, ow, te, fo, dmg, ti, limit)
     if rem then return end
     spd += fo
@@ -711,6 +760,7 @@ function gob(id, p, _on_imp, _on_upd, _on_b_draw, _on_a_draw, _on_die, _on_land)
     end
    end
 
+   -- draw the object's animator with a possible before and after draw call
    o.draw = function(_ENV)
     if on_b_draw then on_b_draw(_ENV) end
     anim:draw(pos)
@@ -723,14 +773,44 @@ function gob(id, p, _on_imp, _on_upd, _on_b_draw, _on_a_draw, _on_die, _on_land)
  )
 end
 
+-- apply the impact of a force with sound, particle effect, terrain destruction, object movement and damage
 function impactor(obj, pos, dir, fo, r, ti, lim, dmg, ow, te, fx_fn, sfx_i, des_s, des_f)
+ -- sound and particle effect of the impact
  sfx(sfx_i)
  _g[fx_fn](pos, 1, dir, v2(fo, fo))
- local d = { { des_s, des_f } }
- if des_s > 2 then add(d, { des_s - 2, des_f * 1.5 }) end
- destruct(pos, dir, d)
+
+ -- destruction of the terrain
+ -- make a list of destructors {{size, force}}
+ local list = { { des_s, des_f } }
+ -- add a smaller, stronger destructor to bigger ones
+ if des_s > 2 then add(list, { des_s - 2, des_f * 1.5 }) end
+ for i = 1, #list do
+  local size, str = unpack(list[i])
+  -- apply a small jitter to even sized destructors
+  if size % 2 == 0 then pos += v2(jitt(), jitt()) end
+  local particles = 0
+  for p in all(dests[size]) do
+   local x, y = pos.x + p.x, pos.y + p.y
+   local c, new_c = get_px(x, y), 1
+   if c ~= 1 and c < 16 then
+    -- based on the world and the destructor's strength decide if the pixel should be damaged or destroyed
+    if rnd() > str - w_str + (c == dmg_col and .3 or 0) then
+     new_c = dmg_col
+    end
+    -- the first 7 destructed pixel will be added to the particle system as dirt, the subsequent pixels has less and less chance to be added.
+    if ((c ~= dmg_col) or (new_c == 1)) and rnd() < (particles < 7 and 1 or 1 - (particles - 7) / 20) then
+     particles += 1
+     drt(v2(x, y), 1, dir * (rnd() < .25 and -1 or 1), v2(.2, .7), 0, 0, nil, { c })
+    end
+    set_px(x, y, new_c)
+   end
+  end
+ end
+
+ -- if an object is given apply the impact on it
  if obj then
   obj:imp(ow, te, dir:norm() * fo, dmg:ab(), ti, lim)
+  -- if a radius is given apply the impact on all objects in that radius (full impact in the center, less in the edges)
  elseif r > 0 then
   for o in all(w_get({ pos = pos }, r, 0)) do
    local str = 1 - pos:sqrdist(o.pos) / r
@@ -740,10 +820,12 @@ function impactor(obj, pos, dir, fo, r, ti, lim, dmg, ow, te, fx_fn, sfx_i, des_
  end
 end
 
+-- if the object is being hit alter its palette
 function get_hit(_ENV)
  if cd.hit then pal_spec(hp > lhp and 7 or hp > ulhp and 10 or 8) end
 end
 
+-- create a box object, which can react to collision with other objects
 function box(id, p, on_b_upd, on_con, filter, on_die)
  return gob(
   id, p,
@@ -770,6 +852,7 @@ function box(id, p, on_b_upd, on_con, filter, on_die)
  )
 end
 
+-- hp box
 function hp_box(p)
  return box(
   2, p, nil, function(_ENV, o)
@@ -786,6 +869,7 @@ function hp_box(p)
  )
 end
 
+-- weapon box
 function w_box(p)
  return box(
   3, p, nil, function(_ENV, s)
@@ -803,6 +887,7 @@ function w_box(p)
  )
 end
 
+-- acid barrel
 function barrel(p)
  return box(
   4, p, nil, nope, 1, function(_ENV, ow, te, fo)
@@ -812,6 +897,7 @@ function barrel(p)
  )
 end
 
+-- land mine
 function mine(p)
  return box(
   5, p, function(_ENV)
@@ -831,6 +917,7 @@ function mine(p)
  )
 end
 
+-- an unit is an object with a weapon and an attack
 function unit(ow, te, god, c1, c2, c3, we_i, ...)
  local u = gob(...)
 
@@ -845,7 +932,9 @@ function unit(ow, te, god, c1, c2, c3, we_i, ...)
  u.cd.god = god
  u.h_free = 0
 
+ -- decide if the unit can attack or not
  u.canattack = function(_ENV)
+  -- get the weapon's and muzzle's position
   local w_pos = anim:get_p(pos)
   local m_pos = we:get_m_pos(w_pos, aim, l)
   if not cd.melee then
@@ -853,14 +942,17 @@ function unit(ow, te, god, c1, c2, c3, we_i, ...)
    for o in all(w_get(_ENV, 72, 0)) do
     local o_hb = o:get_hb()
     local near, far = r_coll(hb, o_hb), p_coll(m_pos, o_hb)
+    -- an unit can perform a melee attack if it collides with another object, or its weapon's muzzle collides with another object
     if near or far then
      return "m", near, near and w_pos or m_pos, o
     end
    end
+   -- the unit can perform a melee attack against the terrain if the muzzle is inside the wall
    if get_px(m_pos.x, m_pos.y) ~= 1 then
     return "m", false, m_pos
    end
   end
+  -- if we have not performed a melee attack, and the weapon is not on cooldown, and it is not reloading, and we have ammo, it means we can shoot
   if not cd.weapon and not cd.reload and mag > 0 then
    return "s", false, w_pos
   end
@@ -869,12 +961,17 @@ function unit(ow, te, god, c1, c2, c3, we_i, ...)
  return u
 end
 
+-- soldier is the player's unit
 function sold(pl, p)
  local s = unit(
+  -- set the owner to the player's id, and set the team according to game mode
   pl.id, menus[1]:get(1) == 1 and 1 or pl.id, 135, pl.c1, pl.c2, pl.c3, 1, 1, p,
+
+  -- on impact
   function(_ENV, ow, te, fo, dmg)
    local le = #fo
    anim:play((not l and fo.x > 0) and (le > .8 and 11 or 5) or (le > .8 and 12 or 4), true)
+   -- in god mode or in case of friendly fire, deal no damage
    if cd.god or (_ow ~= ow and _te == te) then
     return 0
    end
@@ -882,14 +979,15 @@ function sold(pl, p)
    on_suf(pos, ceil(dmg), fo, v2(.3, .6), 2, 0)
    return dmg
   end,
+
+  -- on update
   function(_ENV)
-   if anim.eof then
-    cd.aim = nil
-   end
+   -- reload weapon
    if not cd.reload and p_reload then
     mag = we.mag
    end
    p_reload = cd.reload
+
    local h_dir, a_fo, acc = l and -1 or 1, anim.fo, v2(0, gra)
    local can_control = not (cd.f_move or a_fo)
    -- head free
@@ -899,6 +997,7 @@ function sold(pl, p)
    else
     h_free = 0
    end
+   -- jetpack
    if can_control and joy.o.down then
     if rnd() < .1 then sfx(39) end
     jpa(pos + v2(-h_dir * 2, 1), 1, spd, v2(-.2, -.4))
@@ -918,13 +1017,15 @@ function sold(pl, p)
       break
      end
     end
-    -- move acc
+    -- move acc, and previous left face
     local m_a, prev_l = ground and 0.025 or 0.03, l
+    -- move left or right and set facing direction
     if joy.l.down and not joy.r.down then
      l, acc.x = true, (not s_b and -m_a or 0)
     elseif joy.r.down and not joy.l.down then
      l, acc.x = false, (not s_b and m_a or 0)
     end
+    -- force aim on orientation change
     if l ~= prev_l then
      aim = joy.dir
     end
@@ -966,13 +1067,16 @@ function sold(pl, p)
   end,
   -- on before draw
   function(_ENV)
+   -- draw the weapon (do not draw the knife if it is reloading)
    if not (we.id == 2 and cd.reload) then
+    -- the weapon is blinking if it is reloading
     if cd.reload and cd.reload % 10 > 5 then
      pal_spec(we.id == 3 and 0 or 7)
     end
     we:draw(anim:get_p(pos), aim, l)
     ppal()
    end
+   -- set the colors of the soldier based on hp and god status
    pal(1, c1)
    pal(2, c2)
    pal(3, hp < ulhp and 2 or hp < lhp and 8 or c3)
@@ -982,7 +1086,8 @@ function sold(pl, p)
   end,
   -- on after draw
   function(_ENV)
-   if (we.id == 7 and not cd.weapon and not cd.reload and rnd() < .05) mflm(we:get_m_pos(anim:get_p(pos), aim, l))
+   -- draw the samll flame of the flamethrower
+   if (we.id == 7 and not cd.weapon and not cd.reload and rnd() < .04) mflm(we:get_m_pos(anim:get_p(pos), aim, l))
   end,
   -- on die
   function(_ENV, ow, te, fo, dmg)
@@ -991,8 +1096,10 @@ function sold(pl, p)
    drt(pos, randint(3, 11), fo * (rnd() < .25 and -1 or 1), v2(.2, .7), 0, 0, nil, { c1 }, sticky)
    lim(pos, randint(0, 2), fo, v2(.3, .7), 1, .2, nil, { 8, c1 }, sticky)
    players[_ow].soldier = nil
+   -- if the soldier is killed by the enemy, traps or himself, the owner's score is reduced
    if ow == _ow or ow == 0 then
     players[_ow].scr -= 1
+    -- if the soldier is killed by another player, their score is increased (add 2 points in chaos mode)
    elseif ow ~= 0 then
     players[ow].scr += menus[1]:get(1) == 3 and 2 or 1
    end
@@ -1010,6 +1117,7 @@ function sold(pl, p)
  return s
 end
 
+-- techno squid
 function enemy(p)
  local e = unit(
   0, 0, 0, 0, 8, 2, 11, 6, p,
@@ -1026,6 +1134,7 @@ function enemy(p)
   function(_ENV)
    if not (anim.fo or cd.f_move) then
     local d = v2()
+    -- acquire target
     if not tar or not cd.search then
      cd.search = 90
      tar = acq_tar(_ENV, 0, 1, 0)
@@ -1033,6 +1142,7 @@ function enemy(p)
      if tar.rem then
       tar = nil
      else
+      -- move towards the target
       d = (tar.pos - pos):norm()
       anim.f_x = d.x < 0
       anim.f_y = d.y > 0
@@ -1040,19 +1150,23 @@ function enemy(p)
       acc.y = d.y < 0 and -.05 or d.y > 0 and .05 or 0
      end
     end
+    -- check if we can attack
     if not cd.attack then
      local a_t, near, w_pos, o = canattack(_ENV)
+     -- soldiers has bigger chance to be attacked by the tentacles, but nothing is spared (even other squids)
      if a_t == "m" and o and (rnd() < (o.type == 1 and .1 or .01)) then
       cd.attack = 75
       anim:play(7, true)
       impactor(o, w_pos, o.pos - pos, (v2(.5, .75) * lvl):ab(), 0, 12, .8, v2(1, 2) * lvl, 0, 0, "rhit", 54, 4, .5 * lvl)
+      -- shoot at the target
      elseif a_t == "s" and tar and rnd() < .1 then
       cd.attack = randint(75, 270)
       we:shoot(eye, tar.pos - eye, 0, 0)
      end
     end
+    -- auto anim and speed limit
     anim:play(spd.x > .2 and 6 or abs(d.y) > .2 and 3 or abs(d.y) > .65 and 2 or 1)
-    spd:limit(hp < ulhp and mspd / .5 or hp < lhp and mspd / .75 or mspd)
+    spd:limit(mspd * (hp < ulhp and .5 or hp < lhp and .75 or 1))
     return acc
    end
    return v2(0.01)
@@ -1070,9 +1184,13 @@ function enemy(p)
   -- on die
   function(_ENV, ow, te, fo, dmg)
    sfx(60)
+
    ssmk(pos, randint(7, 13), fo, v2(.2, .4), 2, .25)
    drt(pos, randint(3, 11), fo * (rnd() < .25 and -1 or 1), v2(.2, .7), 0, 0, nil, rnd({ { 0 }, { 8, 2 } }), sticky)
    lim(pos, randint(2, 3), fo, v2(.3, .7), 1, .2, nil, { 2, 0 }, sticky)
+   acid_fx(pos, (lvl - 1) * 3, fo, v2(.1, .3), 2, .2)
+   impactor(nil, pos, fo, .7, lvl * 75, 16, 1, v2(.5, 1) * lvl, ow, te, "orbr", 1, lvl + 2, .6)
+   -- if the squid is killed by a soldier, add a point to the owner's score
    if ow ~= 0 then
     players[ow].scr += 1
    end
@@ -1080,28 +1198,32 @@ function enemy(p)
   -- on land
   nil
  )
- e.eye = p
+ e.eye, e.mspd = p, .1 + lvl * .02
  e.hp += lvl * 3
- e.mspd = .1 + lvl * .02
  return e
 end
 
 -- world manipulation
+-- add an object to the world
 function w_add(o) add(world, o) end
+-- get objects from the world around an object, with radius and filter
 function w_get(obj, sqrdist, filter)
  local near = {}
  for o in all(world) do
-  if o ~= obj and (filter == 0 or (o.type & filter) ~= 0) and (sqrdist == 0 or obj.pos:sqrdist(o.pos) <= sqrdist) then
+  if o ~= obj and not o.rem and (filter == 0 or (o.type & filter) ~= 0) and (sqrdist == 0 or obj.pos:sqrdist(o.pos) <= sqrdist) then
    add(near, o)
   end
  end
  return near
 end
+-- get a random safe spot in the world to place a new object
 function w_spot()
  local i = 0
  while true do
   i += 1
   local p = v2(randint(3, 124), randint(13, 115))
+  -- make sure there are no other objects nearby, and the spot is free
+  -- after 100 try do not check other objects (or in some weird edge cases this can cause the program to hang)
   if ((i > 100 or w_get({ pos = p }, 360 - i * 3, 0) == 0) and free(p - v2(2, 3), v2(5, 6))) return p
  end
 end
@@ -1120,6 +1242,9 @@ function p_upd(_ENV)
  end
 end
 
+-- particle effect constructor
+-- cereates a function that puts the appropriate particles into the system
+-- used both for effects and projectiles
 function part_c(e)
  _g[e.name] = function(pos, bu, di, fo, sp, co, de, cols, on_upd, ow, te, we)
   bu, di, fo, sp, co, de, cols = bu or 1, di and di:norm() or v2(), fo or v2(1, 1), sp or 0, co or 0, de or v2(), cols or e.cols
@@ -1149,6 +1274,7 @@ function part_c(e)
  end
 end
 
+-- combined effect constructor (used in explosions)
 function fx_c(fx)
  _g[fx.na] = function(p, bu, di)
   _g[fx.sho](p)
@@ -1160,14 +1286,17 @@ function fx_c(fx)
  end
 end
 
+-- either a smoke or a spark particle
 function ssmk(...)
  _g[rnd({ "smk", "spa" })](...)
 end
 
+-- any of the 3 smoke particles
 function xsmk(...)
  _g[rnd({ "smk", "smkb", "smkc" })](...)
 end
 
+-- spawn effect (circular or rectangular in two different sizes) with custom colors
 function spawn_fx(pos, ty, si, cols)
  local n = 7 + si * 2
  for i = 1, n do
@@ -1179,6 +1308,7 @@ function spawn_fx(pos, ty, si, cols)
  end
 end
 
+-- sticky particlas has a chanche to stick on the terrain
 function sticky(_ENV)
  if get_px(n_pos.x, n_pos.y) ~= 1 and rnd() < .3 then
   set_px(n_pos.x, n_pos.y, rnd(cols))
@@ -1186,10 +1316,12 @@ function sticky(_ENV)
  end
 end
 
+-- blood effect
 function blood_fx(pos, bu, di, fo, sp, co)
  blo(pos, bu, di, fo, sp, co, nil, nil, sticky)
 end
 
+-- acid effect
 function acid_fx(p, bu, di, fo, sp, co)
  aci(
   p, bu, di, fo, sp, co, nil, nil, function(_ENV)
@@ -1212,6 +1344,7 @@ function acid_fx(p, bu, di, fo, sp, co)
  )
 end
 
+-- reset the game to its initial state (on init or after a battle)
 function reset()
  players = use_data(plf, pld, player_c)
  p_sys = {}
@@ -1225,13 +1358,17 @@ function reset()
  state = 1
 end
 
+-- draw the hud
 function hud()
+ -- in state 1 or 2 display the menu
  if state < 3 then
+  -- in state 1 display the title sprite
   if state == 1 then
    sprites[14]:draw(v2(12, 22))
   end
   menus[state]:draw()
  end
+ -- in state 4 display the high scores
  if state == 4 then
   pprint("this battle is over", 27, 16, 8, 0, "l", true)
   pprint("results:", 27, 26, 8, 0, "l", true)
@@ -1259,15 +1396,21 @@ function hud()
 
  rectfill(0, 0, 127, 7, 0)
  rectfill(0, 120, 127, 127, 0)
+
+ -- in state 3 display the timer
  if state == 3 then
   local s, m = countdown % 60, flr(countdown / 60)
   if countdown > 10 or flic % 30 >= 15 then
    pprint(m .. ":" .. (s < 10 and "0" .. s or s), 64, 1, countdown < 11 and 8 or countdown < 31 and 10 or 7, 1, "c", true)
   end
  end
+
+ -- draw the players
  for p in all(players) do
   p:draw()
  end
+
+ -- set the background color according to the map
  pal(1, bg_col, 1)
 end
 
@@ -1286,9 +1429,11 @@ function submit(id)
   elseif m.idx ~= 5 then
    gen_map()
   else
+   -- if the match is started without a map, generate one
    if not map_done then
     gen_map()
    end
+   -- set the game to the running state
    spwn_i, countdown, lvl, state = 1, menus[1]:get(2) * 3 * 60 + 3, menus[1]:get(5), 3
    schedule(randint(30, 90), upd_spwn)
    schedule(60, upd_countdown)
@@ -1297,6 +1442,7 @@ function submit(id)
  end
 end
 
+-- schedule a function
 function schedule(de, fn)
  add(
   sched, {
@@ -1307,6 +1453,7 @@ function schedule(de, fn)
 end
 
 function _init()
+ -- turn on the music by default, and add a menu item to control it separately
  music(0, 500)
  music_on = true
  menuitem(
@@ -1353,7 +1500,7 @@ function _init()
   _g[k] = v
  end
 
- -- attach tables
+ -- attach lookup tables
  for ts in all(split(tbd, "|")) do
   local t, n, et, ds = {}, unpack(split(ts, "#"))
   for e in all(split(ds)) do
@@ -1363,17 +1510,12 @@ function _init()
   _g[n] = t
  end
 
+ -- build assets from data
  menus = use_data(mef, med, menu_c)
-
  sprites = use_data(spf, spd, sprite_c)
- printh("number of sprites:" .. #sprites, "debug.txt")
-
  anims = use_data(a_f, a_d, env)
-
  weapons = use_data(wpf, wpd, weapon_c)
-
  spwns = use_data(swf, swd, env)
-
  aims = {}
  use_data(aif, aid, function(o) aims[o.n] = o end)
 
@@ -1387,12 +1529,15 @@ end
 
 function _update60()
  flic += 1
+ -- decay drama
  drama_v = max(drama_v - .03, 0)
 
+ -- progress cooldowns
  for k, v in pairs(cd) do
   cd[k] = v > 0 and v - 1 or nil
  end
 
+ -- progress the scheduled functions
  for sc in all(sched) do
   sc.delay -= 1
   if sc.delay <= 0 then
@@ -1401,14 +1546,17 @@ function _update60()
   end
  end
 
+ -- update players
  for p in all(players) do
   p:upd()
  end
 
+ -- update particle system
  for p in all(p_sys) do
   if (p_upd(p)) del(p_sys, p)
  end
 
+ -- update objects in the world
  for o in all(world) do
   if (o:upd()) del(world, o)
  end
@@ -1417,11 +1565,13 @@ end
 function _draw()
  cls()
  ppal()
+ -- apply jitter to the camera if we are shaking
+ camera(cd.shake and jitt() or 0, cd.shake and jitt() or 0)
 
- camera(cd.shake and randint(-1, 1) or 0, cd.shake and randint(-1, 1) or 0)
- -- draw the map
- memcpy(0x6200 + (cd.shake and (64 * randint(-1, 1) + randint(-1, 1)) or 0), 0x8200, 0x1c00)
+ -- draw the map (with jitter if we are shaking)
+ memcpy(0x6200 + (cd.shake and (64 * jitt() + jitt()) or 0), 0x8200, 0x1c00)
 
+ -- draw the objects in the world
  for o in all(world) do
   o:draw()
  end
@@ -1458,6 +1608,7 @@ function _draw()
   end
  end
 
+ -- draw the hud without shake
  camera()
  hud()
 end
@@ -1834,4 +1985,3 @@ __music__
 00 0f0a1614
 00 0f1a1814
 02 0f090d15
-

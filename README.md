@@ -1,7 +1,10 @@
 # Pocket Platoon
 A [PICO-8](https://www.lexaloffle.com/pico-8.php) party game for up to 4 buddies  
-ver: **1.0**  
-as of version 1.0 the game is available on [itch.io](https://donbattery.itch.io/pocket-platoon)
+version: **1.0**  
+
+as of version 1.0 the game is available on:  
+- [itch.io](https://donbattery.itch.io/pocket-platoon) 
+- [Lexaloffle BBS](https://www.lexaloffle.com/bbs/?tid=149841)
 
 [<img src="doc/screenshot.png">](https://donbattery.github.io/pocket_platoon/)  
 Test your skills in this fast-paced post-apocalyptic shooter against the invading techno squids (or your buddies)!  

@@ -1,2 +1,2 @@
 - In the spirit of Pico-8 the whole source code, and art work is open source.
-- The music (Gruber Jam - Space Lizards) is royalty free, so you can also use it in your Pico-8 games.
+- The music (Gruber Jam - Space Lizards) is royalty free, so you can also use it in your Pico-8 games, just give proper credit.

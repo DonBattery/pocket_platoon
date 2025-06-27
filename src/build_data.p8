@@ -389,7 +389,7 @@ particles = {
   gra = 0
  },
  {
-  name = "blproj",
+  name = "bproj",
   kinds = { 4 },
   life = v2(120, 120),
   x_s = v2(),
@@ -1041,7 +1041,7 @@ weapons = {
   mag = 1,
   bu = 1,
   co = .01,
-  r_ti = 60,
+  r_ti = 45,
   w_cd = 0,
   proj_fn = "knife",
   fo = v2(1, 1),
@@ -1056,12 +1056,12 @@ weapons = {
   e_fn = "spa",
   esfx = 43
  },
- -- stinger
+ -- bolter
  {
   id = 3,
   spr_i = 25,
   dmg = v2(.9, 1.1),
-  mag = 30,
+  mag = 35,
   bu = 1,
   co = .015,
   r_ti = 120,
@@ -1087,7 +1087,7 @@ weapons = {
   mag = 5,
   bu = 5,
   co = .023,
-  r_ti = 120,
+  r_ti = 110,
   w_cd = 30,
   proj_fn = "proj1",
   fo = v2(0.9, 1.3),
@@ -1106,13 +1106,13 @@ weapons = {
  {
   id = 5,
   spr_i = 35,
-  dmg = v2(6, 7.5),
-  mag = 3,
+  dmg = v2(6, 7),
+  mag = 4,
   bu = 1,
   co = 0,
-  r_ti = 120,
-  w_cd = 20,
-  proj_fn = "blproj",
+  r_ti = 110,
+  w_cd = 25,
+  proj_fn = "bproj",
   fo = v2(2, 2),
   v_m = 0,
   kn_f = 1.1,
@@ -1133,7 +1133,7 @@ weapons = {
   mag = 1,
   bu = 1,
   co = .01,
-  r_ti = 95,
+  r_ti = 120,
   w_cd = 0,
   proj_fn = "roc",
   fo = v2(.8, .9),
@@ -1155,7 +1155,7 @@ weapons = {
   dmg = v2(.5, .8),
   mag = 50,
   bu = 3,
-  co = .02,
+  co = .01,
   r_ti = 100,
   w_cd = 10,
   proj_fn = "flm",
@@ -1168,27 +1168,27 @@ weapons = {
   d_f = 0,
   m_fn = "nope",
   msfx = 49,
-  e_fn = "xsmk",
+  e_fn = "smk",
   esfx = 34
  },
  -- granadeer
  {
   id = 8,
   spr_i = 50,
-  dmg = v2(6, 9),
-  mag = 4,
+  dmg = v2(4, 6),
+  mag = 5,
   bu = 1,
   co = 0.025,
-  r_ti = 130,
+  r_ti = 120,
   w_cd = 60,
   proj_fn = "projg",
   fo = v2(1.2, 1.3),
   v_m = .08,
   kn_f = 1.4,
   kn_t = 30,
-  kn_r = 256,
-  des = v2(4, 5),
-  d_f = 1,
+  kn_r = 324,
+  des = v2(4, 6),
+  d_f = .75,
   m_fn = "fls2",
   msfx = 1,
   e_fn = "gre",
@@ -1198,20 +1198,20 @@ weapons = {
  {
   id = 9,
   spr_i = 55,
-  dmg = v2(2, 3),
+  dmg = v2(8, 9),
   mag = 1,
   bu = 1,
   co = .01,
-  r_ti = 70,
+  r_ti = 60,
   w_cd = 0,
   proj_fn = "projo",
   fo = v2(.5, .6),
   v_m = 0,
-  kn_f = .7,
-  kn_t = 18,
-  kn_r = 128,
-  des = v2(3, 5),
-  d_f = .5,
+  kn_f = 1,
+  kn_t = 12,
+  kn_r = 50,
+  des = v2(3, 4),
+  d_f = .8,
   m_fn = "scir",
   msfx = 50,
   e_fn = "orbr",
@@ -1256,7 +1256,7 @@ weapons = {
   kn_f = 0.3,
   kn_t = 6,
   kn_r = 8,
-  des = v2(2, 3),
+  des = v2(2, 4),
   d_f = 1,
   m_fn = "scir",
   msfx = 46,
@@ -1281,6 +1281,7 @@ game_objects = {
  -- 1 - soldier
  {
   type = 1,
+  so = 60,
   a_id = 5,
   si = v2(3, 6),
   off = v2(-1, -3),
@@ -1299,6 +1300,7 @@ game_objects = {
  -- 2 - hp box
  {
   type = 2,
+  so = 6,
   a_id = 2,
   si = v2(5, 5),
   off = v2(-2, -2),
@@ -1317,6 +1319,7 @@ game_objects = {
  -- 3 - weapon box
  {
   type = 4,
+  so = 6,
   a_id = 1,
   si = v2(5, 5),
   off = v2(-2, -2),
@@ -1335,6 +1338,7 @@ game_objects = {
  -- 4 - barrel
  {
   type = 8,
+  so = 6,
   a_id = 3,
   si = v2(4, 5),
   off = v2(-1, -2),
@@ -1353,6 +1357,7 @@ game_objects = {
  -- 5 - mine
  {
   type = 16,
+  so = 6,
   a_id = 4,
   si = v2(3, 2),
   off = v2(-1, -1),
@@ -1371,6 +1376,7 @@ game_objects = {
  -- 6 - techno squid
  {
   type = 32,
+  so = 7,
   a_id = 6,
   si = v2(5, 5),
   off = v2(-2, -2),
